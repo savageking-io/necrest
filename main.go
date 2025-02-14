@@ -9,7 +9,7 @@ import (
 )
 
 type RESTConfig struct {
-	Port uint16
+	Port uint16 `yaml:"port"`
 }
 
 func main() {
@@ -40,13 +40,13 @@ func main() {
 				cli.StringFlag{
 					Name:        "config",
 					Usage:       "Configuration filepath",
-					Value:       "rest.yaml",
+					Value:       ConfigFilepath,
 					Destination: &ConfigFilepath,
 				},
 				cli.StringFlag{
 					Name:        "log",
 					Usage:       "Specify logging level",
-					Value:       "info",
+					Value:       LogLevel,
 					Destination: &LogLevel,
 				},
 			},
@@ -58,20 +58,48 @@ func main() {
 }
 
 func Serve(c *cli.Context) error {
-	config := new(necconf.Config)
-	err := config.Init(ConfigurationDirectory)
+	SetLogLevel(LogLevel)
+
+	dir, file, err := necconf.ExtractDirectoryAndFilenameFromPath(ConfigFilepath)
 	if err != nil {
+		log.Error("Bad configuration file: %s", err.Error())
+		return err
+	}
+
+	config := new(necconf.Config)
+	if err := config.Init(dir); err != nil {
 		log.Errorf("Unrecoverable error: %s", err.Error())
 		return err
 	}
 
 	conf := new(RESTConfig)
-	dir := os.DirFS(ConfigurationDirectory)
-	err = config.ReadConfig(dir, ConfigFilepath, &conf)
-	if err != nil {
+	fs := os.DirFS(dir)
+	if err := config.ReadConfig(fs, file, &conf); err != nil {
 		log.Errorf("Failed to read configuration: %s", err.Error())
 		return err
 	}
 
 	return nil
+}
+
+func SetLogLevel(level string) {
+	switch level {
+	case "trace":
+		log.SetLevel(log.TraceLevel)
+		break
+	case "debug":
+		log.SetLevel(log.DebugLevel)
+		break
+	case "info":
+		log.SetLevel(log.InfoLevel)
+		break
+	case "warn":
+		log.SetLevel(log.WarnLevel)
+		break
+	case "error":
+		log.SetLevel(log.ErrorLevel)
+		break
+	default:
+		log.SetLevel(log.InfoLevel)
+	}
 }

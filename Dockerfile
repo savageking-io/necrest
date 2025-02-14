@@ -1,8 +1,15 @@
 FROM golang:1.23-alpine AS builder
 
+ARG CONFIG_DIR=/etc/noerrorcode
+ARG CONFIG_FILE=rest.yaml
+
 WORKDIR /necrest
 
 COPY go.mod go.sum ./
+
+RUN mkdir /etc/noerrorcode
+
+COPY ${CONFIG_FILE} ${CONFIG_DIR}/${CONFIG_FILE}
 
 RUN go mod download
 
