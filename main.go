@@ -3,8 +3,14 @@ package main
 import (
 	"os"
 
+	"github.com/savageking-io/necconf"
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
+
+type RESTConfig struct {
+	Port uint16
+}
 
 func main() {
 	app := cli.NewApp()
@@ -33,8 +39,8 @@ func main() {
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:        "config",
-					Usage:       "Path to config file",
-					Value:       "/etc/noerrorcode/rest.yaml",
+					Usage:       "Configuration filepath",
+					Value:       "rest.yaml",
 					Destination: &ConfigFilepath,
 				},
 				cli.StringFlag{
@@ -48,10 +54,24 @@ func main() {
 		},
 	}
 
-	app.Run(os.Args)
+	_ = app.Run(os.Args)
 }
 
 func Serve(c *cli.Context) error {
-	// Do something
+	config := new(necconf.Config)
+	err := config.Init(ConfigurationDirectory)
+	if err != nil {
+		log.Errorf("Unrecoverable error: %s", err.Error())
+		return err
+	}
+
+	conf := new(RESTConfig)
+	dir := os.DirFS(ConfigurationDirectory)
+	err = config.ReadConfig(dir, ConfigFilepath, &conf)
+	if err != nil {
+		log.Errorf("Failed to read configuration: %s", err.Error())
+		return err
+	}
+
 	return nil
 }
