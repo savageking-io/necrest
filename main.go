@@ -1,77 +1,57 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
 
-	"github.com/savageking-io/necconf"
-	log "github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/go-kit/log"
+	"github.com/oklog/run"
+	"github.com/savageking-io/necrest/service"
+	"github.com/savageking-io/necrest/transport.go"
 )
 
-type RESTConfig struct {
-	Port uint16
-}
-
 func main() {
-	app := cli.NewApp()
-	app.Name = "necrest"
-	app.Version = AppVersion
-	app.Description = "Smart backend service for smart game developers"
-	app.Usage = "REST Microservice of NoErrorCode ecosystem"
-
-	app.Authors = []cli.Author{
-		{
-			Name:  "savageking.io",
-			Email: "i@savageking.io",
-		},
-		{
-			Name:  "Mike Savochkin (crioto)",
-			Email: "mike@crioto.com",
-		},
+	var logger log.Logger
+	{
+		logger = log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr))
+		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+		logger = log.With(logger, "caller", log.DefaultCaller)
 	}
 
-	app.Copyright = "2025 (c) savageking.io. All Rights Reserved"
-
-	app.Commands = []cli.Command{
-		{
-			Name:  "serve",
-			Usage: "Start REST",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:        "config",
-					Usage:       "Configuration filepath",
-					Value:       "rest.yaml",
-					Destination: &ConfigFilepath,
-				},
-				cli.StringFlag{
-					Name:        "log",
-					Usage:       "Specify logging level",
-					Value:       "info",
-					Destination: &LogLevel,
-				},
-			},
-			Action: Serve,
-		},
+	var s service.Service
+	{
+		s = service.New(logger)
+		//s = service.LoggingMiddleware(logger)
 	}
 
-	_ = app.Run(os.Args)
-}
-
-func Serve(c *cli.Context) error {
-	config := new(necconf.Config)
-	err := config.Init(ConfigurationDirectory)
-	if err != nil {
-		log.Errorf("Unrecoverable error: %s", err.Error())
-		return err
+	var h http.Handler
+	{
+		h = transport.NewHTTPHandler(s, logger)
 	}
 
-	conf := new(RESTConfig)
-	dir := os.DirFS(ConfigurationDirectory)
-	err = config.ReadConfig(dir, ConfigFilepath, &conf)
-	if err != nil {
-		log.Errorf("Failed to read configuration: %s", err.Error())
-		return err
-	}
+	var g run.Group
+	g.Add(func() error {
+		logger.Log("msg", "HTTP", "addr", ":8080")
+		return http.ListenAndServe(":8080", h)
+	}, func(error) {
+		logger.Log("msg", "HTTP", "addr", ":8080", "status", "down")
+	})
 
-	return nil
+	interrupt := make(chan struct{})
+	g.Add(func() error {
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt)
+		select {
+		case sig := <-c:
+			return fmt.Errorf("received signal %s", sig)
+		case <-interrupt:
+			return nil
+		}
+	}, func(error) {
+		close(interrupt)
+	})
+
+	g.Run()
 }
