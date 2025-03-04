@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"github.com/savageking-io/necrest/kafka"
 	log "github.com/sirupsen/logrus"
 	"net/http"
 )
@@ -33,10 +32,10 @@ func (d *REST) Init(config *Config) error {
 	return nil
 }
 
-func (d *REST) Start(kafka *kafka.Kafka) error {
+func (d *REST) Start() error {
 	log.Traceln("REST::Start")
 
-	api := API{Kafka: kafka}
+	api := API{}
 
 	d.mux = chi.NewMux()
 	d.mux.Use(cors.Handler(cors.Options{

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/savageking-io/necrest/kafka"
 	"github.com/savageking-io/necrest/rest"
 	"os"
 
@@ -77,26 +76,13 @@ func Serve(c *cli.Context) error {
 		return err
 	}
 
-	// @TODO: Determine how to specify path to kafka.yaml: config? cli options? both?
-	kafkaConfig := new(kafka.KafkaConfig)
-	if err := config.ReadConfig(fs, "kafka.yaml", kafkaConfig); err != nil {
-		log.Errorf("Failed to read Kafka configuration: %s", err.Error())
-		return err
-	}
-
-	k := new(kafka.Kafka)
-	if err := k.Init(kafkaConfig); err != nil {
-		log.Errorf("Failed to init kafka client: %s", err.Error())
-		return err
-	}
-
 	service := new(rest.REST)
 	if err := service.Init(conf); err != nil {
 		log.Errorf("Failed to init REST service: %s", err.Error())
 		return err
 	}
 
-	return service.Start(k)
+	return service.Start()
 }
 
 func SetLogLevel(level string) {
